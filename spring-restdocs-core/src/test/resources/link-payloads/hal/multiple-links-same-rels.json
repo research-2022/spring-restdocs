@@ -1,0 +1,10 @@
+{
+	"_links": {
+		"alpha": [{
+		    "href": "https://alpha.example.com/one",
+			"title": "Alpha one"
+		}, {
+		    "href": "https://alpha.example.com/two"
+		}]
+	}
+}

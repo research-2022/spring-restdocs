@@ -1,0 +1,24 @@
+plugins {
+	id "io.spring.compatibility-test" version "0.0.1"
+	id "java-library"
+	id "maven-publish"
+	id "optional-dependencies"
+}
+
+description = "Spring REST Docs MockMvc"
+
+dependencies {
+	api(project(":spring-restdocs-core"))
+	api("org.springframework:spring-webmvc")
+	api("org.springframework:spring-test")
+
+	implementation("jakarta.servlet:jakarta.servlet-api")
+
+	internal(platform(project(":spring-restdocs-platform")))
+
+	testImplementation(testFixtures(project(":spring-restdocs-core")))
+	testImplementation("junit:junit")
+	testImplementation("org.assertj:assertj-core")
+	testImplementation("org.hamcrest:hamcrest-library")
+	testImplementation("org.mockito:mockito-core")
+}

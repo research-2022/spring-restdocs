@@ -1,0 +1,55 @@
+plugins {
+	id "org.asciidoctor.jvm.convert" version "3.3.2"
+	id "java-library"
+}
+
+repositories {
+	maven { url "https://repo.spring.io/release" }
+	maven { url "https://repo.spring.io/snapshot" }
+}
+
+configurations {
+	asciidoctorExt
+}
+
+dependencies {
+	asciidoctorExt("io.spring.asciidoctor.backends:spring-asciidoctor-backends:0.0.2")
+
+	internal(platform(project(":spring-restdocs-platform")))
+	internal(enforcedPlatform("org.springframework:spring-framework-bom:$springFrameworkVersion"))
+
+	testImplementation(project(":spring-restdocs-mockmvc"))
+	testImplementation(project(":spring-restdocs-restassured"))
+	testImplementation(project(":spring-restdocs-webtestclient"))
+	testImplementation("jakarta.validation:jakarta.validation-api")
+	testImplementation("junit:junit")
+	testImplementation("org.testng:testng:6.9.10")
+	testImplementation("org.junit.jupiter:junit-jupiter-api")
+}
+
+tasks.findByPath("artifactoryPublish")?.enabled = false
+
+tasks.withType(org.asciidoctor.gradle.jvm.AbstractAsciidoctorTask) {
+	baseDirFollowsSourceDir()
+}
+
+jar {
+	enabled = false
+}
+
+javadoc {
+	enabled = false
+}
+
+asciidoctor {
+	configurations 'asciidoctorExt'
+	sources {
+		include "index.adoc"
+	}
+	attributes	"revnumber": project.version,
+				"branch-or-tag": project.version.endsWith("SNAPSHOT") ? "main": "v${project.version}"
+	inputs.files(sourceSets.test.java)
+	outputOptions {
+		backends "spring-html"
+	}
+}

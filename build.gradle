@@ -1,0 +1,208 @@
+plugins {
+	id 'base'
+	id 'io.spring.javaformat' version "$javaFormatVersion" apply false
+	id 'io.spring.nohttp' version '0.0.10' apply false
+	id 'maven-publish'
+}
+
+allprojects {
+	group = "org.springframework.restdocs"
+	repositories {
+		mavenLocal()
+		mavenCentral()
+		maven { url "https://repo.spring.io/milestone" }
+		maven { url "https://repo.spring.io/snapshot" }
+	}
+}
+
+apply plugin: "samples"
+apply plugin: "io.spring.nohttp"
+apply from: "${rootProject.projectDir}/gradle/publish-maven.gradle"
+
+nohttp {
+	source.exclude "samples/rest-notes-slate/slate/**"
+	source.exclude "buildSrc/.gradle/**"
+	source.exclude "**/build/**"
+	source.exclude "**/target/**"
+}
+
+ext {
+	springFrameworkVersion = "6.0.0-M3"
+	javadocLinks = [
+		"https://docs.spring.io/spring-framework/docs/$springFrameworkVersion/javadoc-api/",
+		"https://docs.jboss.org/hibernate/validator/7.0/api/",
+		"https://jakarta.ee/specifications/bean-validation/3.0/apidocs/"
+	] as String[]
+}
+
+check {
+	dependsOn checkstyleNohttp
+}
+
+subprojects { subproject ->
+	plugins.withType(JavaPlugin) {
+		subproject.apply plugin: "io.spring.javaformat"
+		subproject.apply plugin: "checkstyle"
+
+		sourceCompatibility = 17
+		targetCompatibility = 17
+
+		configurations {
+			internal {
+				canBeConsumed = false
+				canBeResolved = false
+			}
+			compileClasspath.extendsFrom(internal)
+			runtimeClasspath.extendsFrom(internal)
+			testCompileClasspath.extendsFrom(internal)
+			testRuntimeClasspath.extendsFrom(internal)
+		}
+
+		test {
+			testLogging {
+				exceptionFormat "full"
+			}
+		}
+
+		compileJava {
+			options.compilerArgs = [ "-Xlint:deprecation", "-Xlint:-options", "-Werror" ]
+		}
+
+		tasks.withType(JavaCompile) {
+			options.encoding = "UTF-8"
+		}
+
+		tasks.withType(Test) {
+			maxHeapSize = "1024M"
+		}
+
+		checkstyle {
+			configFile = rootProject.file("config/checkstyle/checkstyle.xml")
+			configProperties = [ "checkstyle.config.dir" : rootProject.file("config/checkstyle") ]
+			toolVersion = "8.22"
+		}
+
+		dependencies {
+			checkstyle("io.spring.javaformat:spring-javaformat-checkstyle:$javaFormatVersion")
+		}
+
+		plugins.withType(MavenPublishPlugin) {
+			subproject.apply from: "${rootProject.projectDir}/gradle/publish-maven.gradle"
+
+			javadoc {
+				description = "Generates project-level javadoc for use in -javadoc jar"
+				options.memberLevel = org.gradle.external.javadoc.JavadocMemberLevel.PROTECTED
+				options.author = true
+				options.header = "Spring REST Docs $version"
+				options.docTitle = "${options.header} API"
+				options.links = javadocLinks
+				options.addStringOption "-quiet"
+				options.encoding = "UTF-8"
+				options.source = "17"
+			}
+
+			java {
+				withJavadocJar()
+				withSourcesJar()
+			}
+		}
+	}
+
+	tasks.withType(GenerateModuleMetadata) {
+		enabled = false
+	}
+
+}
+
+samples {
+	dependOn "spring-restdocs-core:publishToMavenLocal"
+	dependOn "spring-restdocs-mockmvc:publishToMavenLocal"
+	dependOn "spring-restdocs-restassured:publishToMavenLocal"
+	dependOn "spring-restdocs-webtestclient:publishToMavenLocal"
+	dependOn "spring-restdocs-asciidoctor:publishToMavenLocal"
+
+	restNotesSpringHateoas {
+		workingDir "$projectDir/samples/rest-notes-spring-hateoas"
+	}
+
+	restNotesSpringDataRest {
+		workingDir "$projectDir/samples/rest-notes-spring-data-rest"
+	}
+
+	testNg {
+		workingDir "$projectDir/samples/testng"
+	}
+
+	restAssured {
+		workingDir "$projectDir/samples/rest-assured"
+	}
+
+	webTestClient {
+		workingDir "$projectDir/samples/web-test-client"
+	}
+
+	slate {
+		workingDir "$projectDir/samples/rest-notes-slate"
+		build false
+	}
+
+	junit5 {
+		workingDir "$projectDir/samples/junit5"
+	}
+
+}
+
+task api (type: Javadoc) {
+	group = "Documentation"
+	description = "Generates aggregated Javadoc API documentation."
+	project.rootProject.gradle.projectsEvaluated {
+		Set<String> excludedProjects = ['spring-restdocs-asciidoctor']
+		Set<Project> publishedProjects = rootProject.subprojects.findAll { it != project}
+			.findAll { it.plugins.hasPlugin(JavaPlugin) && it.plugins.hasPlugin(MavenPublishPlugin) }
+			.findAll { !excludedProjects.contains(it.name) }
+			.findAll { !it.name.startsWith('spring-boot-starter') }
+		dependsOn publishedProjects.javadoc
+		source publishedProjects.javadoc.source
+		classpath = project.files(publishedProjects.javadoc.classpath)
+		destinationDir = project.file "${buildDir}/docs/javadoc"
+		options {
+			author = true
+			docTitle = "Spring REST Docs ${project.version} API"
+			encoding = "UTF-8"
+			memberLevel = "protected"
+			outputLevel = "quiet"
+			source = "17"
+			splitIndex = true
+			use = true
+			windowTitle = "Spring REST Docs ${project.version} API"
+		}
+	}
+}
+
+task docsZip(type: Zip, dependsOn: [":docs:asciidoctor", ":api", ":restNotesSpringHateoasGradle"]) {
+	group = "Distribution"
+	archiveBaseName = "spring-restdocs"
+	archiveClassifier = "docs"
+	description = "Builds -${archiveClassifier} archive containing API and reference documentation"
+	destinationDirectory = file("${project.buildDir}/distributions")
+
+	from(project.tasks.findByPath(":docs:asciidoctor")) {
+		into "reference/htmlsingle"
+	}
+
+	from(api) {
+		into "api"
+	}
+
+	from(file("samples/rest-notes-spring-hateoas/build/docs/asciidoc")) {
+		into "samples/restful-notes"
+	}
+}
+
+publishing {
+	publications {
+		maven(MavenPublication) {
+			artifact docsZip
+		}
+	}
+}

@@ -1,0 +1,43 @@
+pluginManagement {
+	repositories {
+		mavenLocal()
+		mavenCentral()
+		maven { url "https://repo.spring.io/plugins-release-local" }
+		maven { url "https://repo.spring.io/release" }
+		gradlePluginPortal()
+	}
+	resolutionStrategy {
+		eachPlugin {
+			if (requested.id.id == "io.spring.javaformat") {
+				useModule "io.spring.javaformat:spring-javaformat-gradle-plugin:${requested.version}"
+			}
+		}
+	}
+}
+
+plugins {
+	id "com.gradle.enterprise" version "3.8.1"
+	id "io.spring.ge.conventions" version "0.0.9"
+}
+
+rootProject.name = "spring-restdocs"
+
+settings.gradle.projectsLoaded {
+	gradleEnterprise {
+		buildScan {
+			settings.gradle.rootProject.getBuildDir().mkdirs()
+			new File(settings.gradle.rootProject.getBuildDir(), "build-scan-uri.txt").text = "build scan not generated"
+			buildScanPublished { scan ->
+				new File(settings.gradle.rootProject.getBuildDir(), "build-scan-uri.txt").text = "<${scan.buildScanUri}|build scan>\n"
+			}
+		}
+	}
+}
+
+include "docs"
+include "spring-restdocs-asciidoctor"
+include "spring-restdocs-core"
+include "spring-restdocs-mockmvc"
+include "spring-restdocs-platform"
+include "spring-restdocs-restassured"
+include "spring-restdocs-webtestclient"

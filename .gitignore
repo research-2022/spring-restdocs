@@ -1,0 +1,10 @@
+.classpath
+.gradle
+.project
+.settings
+bin
+build
+!buildSrc/src/main/groovy/org/springframework/restdocs/build/
+target
+.idea
+*.iml
